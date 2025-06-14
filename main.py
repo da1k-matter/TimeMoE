@@ -131,6 +131,13 @@ if __name__ == "__main__":
         "--eval_steps", type=int, default=None, help="number of evaluation steps"
     )
 
+    parser.add_argument(
+        "--input_size",
+        type=int,
+        default=1,
+        help="Number of features for each time step",
+    )
+
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="adam beta1")
     parser.add_argument("--adam_beta2", type=float, default=0.95, help="adam beta2")
     parser.add_argument("--adam_epsilon", type=float, default=1e-8, help="adam epsilon")
@@ -187,4 +194,5 @@ if __name__ == "__main__":
         dataloader_num_workers=args.dataloader_num_workers,
         save_only_model=args.save_only_model,
         save_total_limit=args.save_total_limit,
+        input_size=args.input_size,
     )
