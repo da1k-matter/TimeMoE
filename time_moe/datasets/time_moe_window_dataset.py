@@ -37,13 +37,14 @@ class TimeMoEWindowDataset:
         >>>     print(sample['input_ids'], sample['labels'], sample['loss_masks'])
     """
 
-    def __init__(self, dataset: TimeSeriesDataset, context_length: int, prediction_length: int = 0, stride: int = None, **kwrags):
+    def __init__(self, dataset: TimeSeriesDataset, context_length: int, prediction_length: int = 0, stride: int = None, input_size: int = 1, **kwrags):
         self.dataset = dataset
         self.context_length = context_length
         self.prediction_length = prediction_length
         self.window_size = context_length + prediction_length
         self.window_size_plus_one = self.window_size + 1
         self.stride = stride if stride else self.window_size
+        self.input_size = input_size
 
         num_seqs = len(self.dataset)
         iterator = range(num_seqs)
@@ -54,7 +55,7 @@ class TimeMoEWindowDataset:
             pass
         self.sub_seq_indexes = []
         for seq_idx in iterator:
-            n_points = self.dataset.get_sequence_length_by_idx(seq_idx)
+            n_points = self.dataset.get_sequence_length_by_idx(seq_idx) // self.input_size
             # Skip sequences with fewer than 2 points
             if n_points < 2:
                 continue
@@ -75,13 +76,15 @@ class TimeMoEWindowDataset:
 
     def __getitem__(self, seq_idx):
         seq_i, offset_i = self.sub_seq_indexes[seq_idx]
-        seq = self.dataset[seq_i][offset_i: offset_i + self.window_size_plus_one]
-        seq = np.array(seq, dtype=np.float32)
+        start = offset_i * self.input_size
+        end = (offset_i + self.window_size_plus_one) * self.input_size
+        seq = self.dataset[seq_i][start: end]
+        seq = np.array(seq, dtype=np.float32).reshape(-1, self.input_size)
 
-        loss_mask = np.ones(len(seq) - 1, dtype=np.int32)
-        n_pad = self.window_size_plus_one - len(seq)
+        loss_mask = np.ones(seq.shape[0] - 1, dtype=np.int32)
+        n_pad = self.window_size_plus_one - seq.shape[0]
         if n_pad > 0:
-            seq = np.pad(seq, (0, n_pad), 'constant', constant_values=0)
+            seq = np.pad(seq, ((0, n_pad), (0, 0)), 'constant', constant_values=0)
             loss_mask = np.pad(loss_mask, (0, n_pad), 'constant', constant_values=0)
 
         return {

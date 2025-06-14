@@ -25,7 +25,7 @@ class TimeMoeRunner:
         self.output_path = output_path
         self.seed = seed
 
-    def load_model(self, model_path: str = None, from_scatch: bool = False, **kwargs):
+    def load_model(self, model_path: str = None, from_scatch: bool = False, input_size: int = None, **kwargs):
         if model_path is None:
             model_path = self.model_path
         attn = kwargs.pop('attn_implementation', None)
@@ -51,8 +51,12 @@ class TimeMoeRunner:
 
         if from_scatch:
             config = TimeMoeConfig.from_pretrained(model_path, _attn_implementation=attn)
+            if input_size is not None:
+                config.input_size = input_size
             model = TimeMoeForPrediction(config)
         else:
+            if input_size is not None:
+                kwargs['input_size'] = input_size
             model = TimeMoeForPrediction.from_pretrained(model_path, **kwargs)
         return model
 
@@ -162,6 +166,7 @@ class TimeMoeRunner:
                 model_path=model_path,
                 from_scatch=from_scratch,
                 torch_dtype=torch_dtype,
+                input_size=train_config.get('input_size'),
                 attn_implementation=train_config.get('attn_implementation', 'eager'),
             )
             log_in_local_rank_0(f'Load model parameters from: {model_path}')
@@ -188,6 +193,7 @@ class TimeMoeRunner:
             max_length=train_config["max_length"],
             stride=train_config["stride"],
             normalization_method=train_config["normalization_method"],
+            input_size=train_config.get("input_size", 1),
         )
         trainer = TimeMoeTrainer(
             model=model,
@@ -200,11 +206,18 @@ class TimeMoeRunner:
 
         return trainer.model
 
-    def get_train_dataset(self, data_path, max_length, stride, normalization_method):
+    def get_train_dataset(self, data_path, max_length, stride, normalization_method, input_size=1):
         log_in_local_rank_0('Loading dataset...')
         dataset = TimeMoEDataset(data_path, normalization_method=normalization_method)
         log_in_local_rank_0('Processing dataset to fixed-size sub-sequences...')
-        window_dataset = TimeMoEWindowDataset(dataset, context_length=max_length, prediction_length=0, stride=stride, shuffle=False)
+        window_dataset = TimeMoEWindowDataset(
+            dataset,
+            context_length=max_length,
+            prediction_length=0,
+            stride=stride,
+            shuffle=False,
+            input_size=input_size,
+        )
         return window_dataset
 
 
