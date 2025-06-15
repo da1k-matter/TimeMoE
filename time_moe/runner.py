@@ -10,6 +10,7 @@ from time_moe.datasets.time_moe_dataset import TimeMoEDataset
 from time_moe.datasets.time_moe_window_dataset import TimeMoEWindowDataset
 from time_moe.models.modeling_time_moe import TimeMoeForPrediction, TimeMoeConfig
 from time_moe.trainer.hf_trainer import TimeMoETrainingArguments, TimeMoeTrainer
+from time_moe.trainer import LossProgressCallback
 from time_moe.utils.dist_util import get_world_size
 from time_moe.utils.log_util import logger, log_in_local_rank_0
 
@@ -200,6 +201,7 @@ class TimeMoeRunner:
             args=training_args,
             train_dataset=train_ds,
         )
+        trainer.add_callback(LossProgressCallback())
         trainer.train()
         trainer.save_model(self.output_path)
         log_in_local_rank_0(f'Saving model to {self.output_path}')
