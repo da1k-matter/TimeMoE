@@ -85,17 +85,23 @@ class BenchmarkEvalDataset(Dataset):
 
 class GeneralEvalDataset(Dataset):
 
-    def __init__(self, data_path, context_length: int, prediction_length: int, onfly_norm: bool = False):
+    def __init__(self, data_path, context_length: int, prediction_length: int,
+                 onfly_norm: bool = False, input_size: int = 1):
         super().__init__()
         self.context_length = context_length
         self.prediction_length = prediction_length
         self.onfly_norm = onfly_norm
+        self.input_size = input_size
         self.window_length = self.context_length + self.prediction_length
         self.dataset = GeneralDataset(data_path)
 
         self.sub_seq_indexes = []
         for seq_idx, seq in enumerate(self.dataset):
-            n_points = len(seq)
+            seq_arr = np.array(seq)
+            if seq_arr.ndim == 1:
+                n_points = len(seq_arr) // self.input_size
+            else:
+                n_points = seq_arr.shape[0]
             if n_points < self.window_length:
                 continue
             for offset_idx in range(self.window_length, n_points):
@@ -110,12 +116,13 @@ class GeneralEvalDataset(Dataset):
 
     def __getitem__(self, idx):
         seq_i, offset_i = self.sub_seq_indexes[idx]
-        seq = self.dataset[seq_i]
+        seq = np.array(self.dataset[seq_i], dtype=np.float32)
+        if seq.ndim == 1:
+            seq = seq.reshape(-1, self.input_size)
+        window_seq = seq[offset_i - self.window_length: offset_i]
 
-        window_seq = np.array(seq[offset_i - self.window_length: offset_i], dtype=np.float32)
-
-        inputs = np.array(window_seq[: self.context_length], dtype=np.float32)
-        labels = np.array(window_seq[-self.prediction_length:], dtype=np.float32)
+        inputs = window_seq[: self.context_length]
+        labels = window_seq[-self.prediction_length:]
 
         if self.onfly_norm:
             mean_ = inputs.mean()
@@ -126,6 +133,6 @@ class GeneralEvalDataset(Dataset):
             labels = (labels - mean_) / std_
 
         return {
-            'inputs': np.array(window_seq[: self.context_length], dtype=np.float32),
-            'labels': np.array(window_seq[-self.prediction_length:], dtype=np.float32),
+            'inputs': np.array(inputs, dtype=np.float32),
+            'labels': np.array(labels, dtype=np.float32),
         }
