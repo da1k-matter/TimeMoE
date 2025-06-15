@@ -1,5 +1,7 @@
 import argparse
 from time_moe.runner import TimeMoeRunner
+import os
+os.environ["WANDB_MODE"] = "disabled"
 
 
 if __name__ == "__main__":
