@@ -96,6 +96,7 @@ def evaluate(args):
     batch_size = args.batch_size
     context_length = args.context_length
     prediction_length = args.prediction_length
+    input_size = args.input_size
 
     master_addr = os.getenv('MASTER_ADDR', '127.0.0.1')
     master_port = os.getenv('MASTER_PORT', 9899)
@@ -138,6 +139,7 @@ def evaluate(args):
             args.data,
             context_length=context_length,
             prediction_length=prediction_length,
+            input_size=input_size,
         )
 
     if torch.cuda.is_available() and dist.is_initialized():
@@ -223,6 +225,12 @@ if __name__ == '__main__':
         type=int,
         default=96,
         help='Prediction length'
+    )
+    parser.add_argument(
+        '--input_size', '-i',
+        type=int,
+        default=1,
+        help='Number of features for each time step'
     )
     args = parser.parse_args()
     if args.context_length is None:
