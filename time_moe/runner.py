@@ -58,6 +58,7 @@ class TimeMoeRunner:
         else:
             if input_size is not None:
                 kwargs['input_size'] = input_size
+            kwargs.setdefault('ignore_mismatched_sizes', True)
             model = TimeMoeForPrediction.from_pretrained(model_path, **kwargs)
         return model
 
