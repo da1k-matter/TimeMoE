@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 _*-
 import os
+import multiprocessing as mp
 import numpy as np
 
 from .ts_dataset import TimeSeriesDataset
@@ -8,24 +9,48 @@ from .general_dataset import GeneralDataset
 from .binary_dataset import BinaryDataset
 
 
+def _load_general_ds_worker(args):
+    path, streaming = args
+    ds = GeneralDataset(path, streaming=streaming)
+    if len(ds) > 0:
+        return ds
+    return None
+
+
+def _load_binary_ds_worker(path):
+    ds = BinaryDataset(path)
+    if len(ds) > 0:
+        return ds
+    return None
+
+
 class TimeMoEDataset(TimeSeriesDataset):
 
-    def __init__(self, data_folder, normalization_method=None, streaming: bool = False):
+    def __init__(
+        self,
+        data_folder,
+        normalization_method=None,
+        streaming: bool = False,
+        num_workers: int = 0,
+    ):
         self.data_folder = data_folder
         self.normalization_method = normalization_method
         self.datasets = []
         self.num_tokens = None
         self.streaming = streaming
+        self.num_workers = mp.cpu_count() if not num_workers else num_workers
 
         if normalization_method is None:
             self.normalization_method = None
         elif isinstance(normalization_method, str):
-            if normalization_method.lower() == 'max':
+            if normalization_method.lower() == "max":
                 self.normalization_method = max_scaler
-            elif normalization_method.lower() == 'zero':
+            elif normalization_method.lower() == "zero":
                 self.normalization_method = zero_scaler
             else:
-                raise ValueError(f'Unknown normalization method: {normalization_method}')
+                raise ValueError(
+                    f"Unknown normalization method: {normalization_method}"
+                )
         else:
             self.normalization_method = normalization_method
 
@@ -39,25 +64,43 @@ class TimeMoEDataset(TimeSeriesDataset):
                 self.datasets.append(ds)
         else:
             # walk through the data_folder
+            general_files = []
+            binary_folders = []
             for root, dirs, files in os.walk(self.data_folder):
                 for file in files:
                     fn_path = os.path.join(root, file)
-                    if file != BinaryDataset.meta_file_name and GeneralDataset.is_valid_path(fn_path):
-                        ds = GeneralDataset(fn_path, streaming=streaming)
-                        if len(ds) > 0:
-                            self.datasets.append(ds)
+                    if (
+                        file != BinaryDataset.meta_file_name
+                        and GeneralDataset.is_valid_path(fn_path)
+                    ):
+                        general_files.append(fn_path)
                 for sub_folder in dirs:
                     folder_path = os.path.join(root, sub_folder)
                     if BinaryDataset.is_valid_path(folder_path):
-                        ds = BinaryDataset(folder_path)
-                        if len(ds) > 0:
-                            self.datasets.append(ds)
+                        binary_folders.append(folder_path)
+
+            if self.num_workers > 1:
+                with mp.Pool(self.num_workers) as pool:
+                    g_ds = pool.map(
+                        _load_general_ds_worker, [(p, streaming) for p in general_files]
+                    )
+                    b_ds = pool.map(_load_binary_ds_worker, binary_folders)
+                for ds in g_ds + b_ds:
+                    if ds is not None and len(ds) > 0:
+                        self.datasets.append(ds)
+            else:
+                for fn_path in general_files:
+                    ds = GeneralDataset(fn_path, streaming=streaming)
+                    if len(ds) > 0:
+                        self.datasets.append(ds)
+                for folder_path in binary_folders:
+                    ds = BinaryDataset(folder_path)
+                    if len(ds) > 0:
+                        self.datasets.append(ds)
 
         self.cumsum_lengths = [0]
         for ds in self.datasets:
-            self.cumsum_lengths.append(
-                self.cumsum_lengths[-1] + len(ds)
-            )
+            self.cumsum_lengths.append(self.cumsum_lengths[-1] + len(ds))
         self.num_sequences = self.cumsum_lengths[-1]
 
     def __len__(self):
@@ -65,9 +108,11 @@ class TimeMoEDataset(TimeSeriesDataset):
 
     def __getitem__(self, seq_idx):
         if seq_idx >= self.cumsum_lengths[-1]:
-            raise ValueError(f'Index out of the dataset length: {seq_idx} >= {self.cumsum_lengths[-1]}')
+            raise ValueError(
+                f"Index out of the dataset length: {seq_idx} >= {self.cumsum_lengths[-1]}"
+            )
         elif seq_idx < 0:
-            raise ValueError(f'Index out of the dataset length: {seq_idx} < 0')
+            raise ValueError(f"Index out of the dataset length: {seq_idx} < 0")
 
         dataset_idx = binary_search(self.cumsum_lengths, seq_idx)
         dataset_offset = seq_idx - self.cumsum_lengths[dataset_idx]
@@ -79,9 +124,11 @@ class TimeMoEDataset(TimeSeriesDataset):
 
     def get_sequence_length_by_idx(self, seq_idx):
         if seq_idx >= self.cumsum_lengths[-1]:
-            raise ValueError(f'Index out of the dataset length: {seq_idx} >= {self.cumsum_lengths[-1]}')
+            raise ValueError(
+                f"Index out of the dataset length: {seq_idx} >= {self.cumsum_lengths[-1]}"
+            )
         elif seq_idx < 0:
-            raise ValueError(f'Index out of the dataset length: {seq_idx} < 0')
+            raise ValueError(f"Index out of the dataset length: {seq_idx} < 0")
 
         dataset_idx = binary_search(self.cumsum_lengths, seq_idx)
         dataset_offset = seq_idx - self.cumsum_lengths[dataset_idx]

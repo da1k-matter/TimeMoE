@@ -192,6 +192,8 @@ You have the flexibility to save your converted data in `jsonl`, `json`, or `pic
 
 **Note: If your dataset is small, it is recommended to set `stride` to `1` by adding `--stride 1` to your training command.**
 
+To accelerate dataset loading on large files, use the new argument `--dataset_num_workers` to specify the number of worker processes. Set it to `0` (default) to leverage all available CPU cores.
+
 **CPU**
 
 For training with cpu, execute the following command and ensure to replace `<data_path>` with the path to your prepared dataset:

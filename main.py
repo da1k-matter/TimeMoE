@@ -1,6 +1,7 @@
 import argparse
 from time_moe.runner import TimeMoeRunner
 import os
+
 os.environ["WANDB_MODE"] = "disabled"
 
 
@@ -158,6 +159,12 @@ if __name__ == "__main__":
         help="number of workers for dataloader",
     )
     parser.add_argument(
+        "--dataset_num_workers",
+        type=int,
+        default=0,
+        help="number of workers for loading dataset (0 means use all cores)",
+    )
+    parser.add_argument(
         "--data_streaming",
         action="store_true",
         help="Enable streaming mode when loading dataset",
@@ -166,7 +173,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.flash_attn:
-        args.attn_implementation = 'flash_attention_2'
+        args.attn_implementation = "flash_attention_2"
 
     if args.normalization_method == "none":
         args.normalization_method = None
@@ -207,6 +214,7 @@ if __name__ == "__main__":
         logging_steps=args.logging_steps,
         max_grad_norm=args.max_grad_norm,
         dataloader_num_workers=args.dataloader_num_workers,
+        dataset_num_workers=args.dataset_num_workers,
         save_only_model=args.save_only_model,
         save_total_limit=args.save_total_limit,
         input_size=args.input_size,
