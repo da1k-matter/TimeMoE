@@ -60,6 +60,7 @@ class TimeMoE:
             }
             if flash_attn:
                 args['attn_implementation'] = 'flash_attention_2'
+            args.setdefault('ignore_mismatched_sizes', True)
             model = TimeMoeForPrediction.from_pretrained(
                 model_path,
                 **args,
