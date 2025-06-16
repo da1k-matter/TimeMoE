@@ -9,6 +9,7 @@ import pandas_ta
 from sklearn.preprocessing import MinMaxScaler
 import joblib
 from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
 
 # --- 1. GLOBAL CONFIGURATION ---
 DATA_DIR = "data_test"
@@ -46,6 +47,65 @@ def add_features(df):
     df.dropna(inplace=True)
     return df
 
+# --- 2b. Multiprocessing helpers ---
+
+def _load_for_scaler(path):
+    """Read a CSV and preprocess it for scaler fitting."""
+    df = pd.read_csv(path)
+    if len(df) < MIN_BARS:
+        return None
+    df.columns = [str(col).lower().strip() for col in df.columns]
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df.set_index('timestamp', inplace=True)
+    return df
+
+
+_SCALER = None
+_FEATURE_COLS = None
+
+
+def _init_worker(scaler_path, feature_cols):
+    global _SCALER, _FEATURE_COLS
+    _SCALER = joblib.load(scaler_path)
+    _FEATURE_COLS = feature_cols
+
+
+def _process_file(path):
+    """Process a single CSV file into jsonl lines."""
+    df = pd.read_csv(path)
+    if len(df) < MIN_BARS:
+        return 0, []
+
+    df.columns = [str(col).lower().strip() for col in df.columns]
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df.set_index('timestamp', inplace=True)
+
+    df_featured = add_features(df.copy())
+    if df_featured is None or df_featured.empty:
+        return 0, []
+    df_featured = df_featured[_FEATURE_COLS]
+
+    normalized_data = _SCALER.transform(df_featured)
+
+    total_length = CONTEXT_LENGTH + PREDICTION_LENGTH
+    num_sequences_in_file = len(normalized_data) - total_length + 1
+    if num_sequences_in_file <= 0:
+        return 0, []
+
+    lines = []
+    for i in range(num_sequences_in_file):
+        window = normalized_data[i : i + total_length]
+        sequence = window.flatten().tolist()
+        json_line = json.dumps({
+            "sequence": sequence,
+            "prediction_length": PREDICTION_LENGTH,
+        })
+        lines.append(json_line + "\n")
+
+    return num_sequences_in_file, lines
+
 # --- 3. MAIN DATA PREPARATION PIPELINE (REWRITTEN) ---
 
 def run_preparation():
@@ -59,20 +119,10 @@ def run_preparation():
     print("Pass 1: Fitting the Scaler on all available data...")
     
     all_data_for_scaler = []
-    for f in tqdm(csv_files, desc="Reading files for scaler"):
-        df = pd.read_csv(f)
-        if len(df) < MIN_BARS:
-            continue
-            
-        df.columns = [str(col).lower().strip() for col in df.columns]
-        
-        # --- FIX: Convert timestamp to index IN PASS 1 as well ---
-        if 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            df.set_index('timestamp', inplace=True)
-        # --- END OF FIX ---
-
-        all_data_for_scaler.append(df)
+    with Pool(processes=cpu_count()) as pool:
+        for df in tqdm(pool.imap(_load_for_scaler, csv_files), total=len(csv_files), desc="Reading files for scaler"):
+            if df is not None:
+                all_data_for_scaler.append(df)
 
     if not all_data_for_scaler:
         print("No files met the MIN_BARS requirement. Exiting.")
@@ -104,45 +154,12 @@ def run_preparation():
     total_sequences_written = 0
     processed_files_count = 0
 
-    with open(OUTPUT_FILE, 'w') as f_out:
-        for f in tqdm(csv_files, desc="Processing individual files"):
-            df = pd.read_csv(f)
-            if len(df) < MIN_BARS:
+    with open(OUTPUT_FILE, 'w') as f_out, Pool(processes=cpu_count(), initializer=_init_worker, initargs=(SCALER_FILE, final_feature_columns)) as pool:
+        for num_seqs, lines in tqdm(pool.imap(_process_file, csv_files), total=len(csv_files), desc="Processing individual files"):
+            if num_seqs == 0:
                 continue
-
-            df.columns = [str(col).lower().strip() for col in df.columns]
-            if 'timestamp' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-                df.set_index('timestamp', inplace=True)
-            
-            # 1. Add features to the current file's data
-            df_featured = add_features(df.copy())
-            if df_featured is None or df_featured.empty:
-                continue
-
-            # Ensure the columns are in the exact same order as when the scaler was fitted
-            df_featured = df_featured[final_feature_columns]
-
-            # 2. Normalize using the ALREADY FITTED global scaler
-            normalized_data = scaler.transform(df_featured)
-
-            # 3. Create and write sequences for THIS file
-            total_length = CONTEXT_LENGTH + PREDICTION_LENGTH
-            num_sequences_in_file = len(normalized_data) - total_length + 1
-            
-            if num_sequences_in_file <= 0:
-                continue
-
-            for i in tqdm(range(num_sequences_in_file), desc=f"Sequences in {os.path.basename(f)}", leave=False):
-                window = normalized_data[i : i + total_length]
-                sequence = window.flatten().tolist()
-                json_line = json.dumps({
-                    "sequence": sequence,
-                    "prediction_length": PREDICTION_LENGTH
-                })
-                f_out.write(json_line + '\n')
-            
-            total_sequences_written += num_sequences_in_file
+            f_out.writelines(lines)
+            total_sequences_written += num_seqs
             processed_files_count += 1
             
     print(f"\nDone! Processed {processed_files_count} files.")
