@@ -61,6 +61,11 @@ if __name__ == "__main__":
         default="auto",
         help="attention implementation",
     )
+    parser.add_argument(
+        "--flash_attn",
+        action="store_true",
+        help="Enable flash attention (sets attn_implementation to flash_attention_2)",
+    )
 
     parser.add_argument(
         "--lr_scheduler_type",
@@ -154,6 +159,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    if args.flash_attn:
+        args.attn_implementation = 'flash_attention_2'
 
     if args.normalization_method == "none":
         args.normalization_method = None
