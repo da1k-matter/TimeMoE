@@ -34,7 +34,7 @@ class TimeMoEDataset(TimeSeriesDataset):
             if len(ds) > 0:
                 self.datasets.append(ds)
         elif GeneralDataset.is_valid_path(self.data_folder):
-            ds = GeneralDataset(self.data_folder, streaming=streaming)
+            ds = GeneralDataset(self.data_folder, streaming=streaming, num_workers=os.cpu_count())
             if len(ds) > 0:
                 self.datasets.append(ds)
         else:
@@ -43,7 +43,7 @@ class TimeMoEDataset(TimeSeriesDataset):
                 for file in files:
                     fn_path = os.path.join(root, file)
                     if file != BinaryDataset.meta_file_name and GeneralDataset.is_valid_path(fn_path):
-                        ds = GeneralDataset(fn_path, streaming=streaming)
+                        ds = GeneralDataset(fn_path, streaming=streaming, num_workers=os.cpu_count())
                         if len(ds) > 0:
                             self.datasets.append(ds)
                 for sub_folder in dirs:
