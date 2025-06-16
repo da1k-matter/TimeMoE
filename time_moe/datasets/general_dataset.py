@@ -11,24 +11,53 @@ from .ts_dataset import TimeSeriesDataset
 
 
 class GeneralDataset(TimeSeriesDataset):
-    def __init__(self, data_path, streaming: bool = False):
+    def __init__(self, data_path, streaming: bool = False, num_workers: int = None):
         self.streaming = streaming
         self.num_tokens = None
+        if num_workers is None:
+            num_workers = os.cpu_count() or 1
+        self.num_workers = max(1, int(num_workers))
 
         if streaming and data_path.endswith('.jsonl'):
             self.data_path = data_path
             self.offsets = []
             self.seq_lens = []
             cur_offset = 0
-            with open(data_path, 'r', encoding='utf-8') as f:
-                line = f.readline()
-                while line:
-                    self.offsets.append(cur_offset)
-                    obj = json.loads(line)
-                    seq = obj.get('sequence', obj)
-                    self.seq_lens.append(len(seq))
-                    cur_offset = f.tell()
+
+            def _parse_line(line: str) -> int:
+                obj = json.loads(line)
+                seq = obj.get('sequence', obj)
+                return len(seq)
+
+            if self.num_workers > 1:
+                from multiprocessing import Pool
+                batch_lines = []
+                batch_offsets = []
+                with Pool(self.num_workers) as pool, open(data_path, 'r', encoding='utf-8') as f:
                     line = f.readline()
+                    while line:
+                        batch_offsets.append(cur_offset)
+                        batch_lines.append(line)
+                        cur_offset = f.tell()
+                        if len(batch_lines) >= 1024:
+                            lens = pool.map(_parse_line, batch_lines)
+                            self.offsets.extend(batch_offsets)
+                            self.seq_lens.extend(lens)
+                            batch_lines.clear()
+                            batch_offsets.clear()
+                        line = f.readline()
+                    if batch_lines:
+                        lens = pool.map(_parse_line, batch_lines)
+                        self.offsets.extend(batch_offsets)
+                        self.seq_lens.extend(lens)
+            else:
+                with open(data_path, 'r', encoding='utf-8') as f:
+                    line = f.readline()
+                    while line:
+                        self.offsets.append(cur_offset)
+                        self.seq_lens.append(_parse_line(line))
+                        cur_offset = f.tell()
+                        line = f.readline()
             self.data = None
         else:
             self.data = read_file_by_extension(data_path)
