@@ -157,6 +157,11 @@ if __name__ == "__main__":
         default=4,
         help="number of workers for dataloader",
     )
+    parser.add_argument(
+        "--data_streaming",
+        action="store_true",
+        help="Enable streaming mode when loading dataset",
+    )
 
     args = parser.parse_args()
 
@@ -205,4 +210,5 @@ if __name__ == "__main__":
         save_only_model=args.save_only_model,
         save_total_limit=args.save_total_limit,
         input_size=args.input_size,
+        data_streaming=args.data_streaming,
     )

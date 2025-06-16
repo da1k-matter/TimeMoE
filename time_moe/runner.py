@@ -195,6 +195,7 @@ class TimeMoeRunner:
             stride=train_config["stride"],
             normalization_method=train_config["normalization_method"],
             input_size=train_config.get("input_size", 1),
+            streaming=train_config.get("data_streaming", False),
         )
         trainer = TimeMoeTrainer(
             model=model,
@@ -208,9 +209,13 @@ class TimeMoeRunner:
 
         return trainer.model
 
-    def get_train_dataset(self, data_path, max_length, stride, normalization_method, input_size=1):
+    def get_train_dataset(self, data_path, max_length, stride, normalization_method, input_size=1, streaming=False):
         log_in_local_rank_0('Loading dataset...')
-        dataset = TimeMoEDataset(data_path, normalization_method=normalization_method)
+        dataset = TimeMoEDataset(
+            data_path,
+            normalization_method=normalization_method,
+            streaming=streaming,
+        )
         log_in_local_rank_0('Processing dataset to fixed-size sub-sequences...')
         window_dataset = TimeMoEWindowDataset(
             dataset,

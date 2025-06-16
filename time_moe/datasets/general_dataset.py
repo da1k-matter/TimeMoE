@@ -11,27 +11,61 @@ from .ts_dataset import TimeSeriesDataset
 
 
 class GeneralDataset(TimeSeriesDataset):
-    def __init__(self, data_path):
-        self.data = read_file_by_extension(data_path)
+    def __init__(self, data_path, streaming: bool = False):
+        self.streaming = streaming
         self.num_tokens = None
 
+        if streaming and data_path.endswith('.jsonl'):
+            self.data_path = data_path
+            self.offsets = []
+            self.seq_lens = []
+            with open(data_path, 'r', encoding='utf-8') as f:
+                while True:
+                    cur_offset = f.tell()
+                    line = f.readline()
+                    if not line:
+                        break
+                    self.offsets.append(cur_offset)
+                    obj = json.loads(line)
+                    seq = obj.get('sequence', obj)
+                    self.seq_lens.append(len(seq))
+            self.data = None
+        else:
+            self.data = read_file_by_extension(data_path)
+
     def __len__(self):
+        if self.streaming:
+            return len(self.offsets)
         return len(self.data)
 
     def __getitem__(self, seq_idx):
-        seq = self.data[seq_idx]
-        if isinstance(seq, dict):
-            seq = seq['sequence']
-        return seq
+        if self.streaming:
+            with open(self.data_path, 'r', encoding='utf-8') as f:
+                f.seek(self.offsets[seq_idx])
+                line = f.readline()
+                obj = json.loads(line)
+                seq = obj.get('sequence', obj)
+                return seq
+        else:
+            seq = self.data[seq_idx]
+            if isinstance(seq, dict):
+                seq = seq['sequence']
+            return seq
 
     def get_num_tokens(self):
         if self.num_tokens is None:
-            self.num_tokens = sum([len(seq) for seq in self])
+            if self.streaming:
+                self.num_tokens = sum(self.seq_lens)
+            else:
+                self.num_tokens = sum([len(seq) for seq in self])
         return self.num_tokens
 
     def get_sequence_length_by_idx(self, seq_idx):
-        seq = self[seq_idx]
-        return len(seq)
+        if self.streaming:
+            return self.seq_lens[seq_idx]
+        else:
+            seq = self[seq_idx]
+            return len(seq)
 
     @staticmethod
     def is_valid_path(data_path):
