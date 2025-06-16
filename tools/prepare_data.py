@@ -147,7 +147,7 @@ def run_preparation():
             
     print(f"\nDone! Processed {processed_files_count} files.")
     print(f"Created '{OUTPUT_FILE}' with a total of {total_sequences_written} sequences.")
-    print(f"IMPORTANT: Remember to set 'patch_len = {NUM_FEATURES}' in your model's config file.")
+    print(f"IMPORTANT: Remember to set 'input_len = {NUM_FEATURES}' in your model's config file.")
 
 if __name__ == "__main__":
     run_preparation()
