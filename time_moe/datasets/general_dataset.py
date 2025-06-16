@@ -21,12 +21,14 @@ class GeneralDataset(TimeSeriesDataset):
             self.seq_lens = []
             cur_offset = 0
             with open(data_path, 'r', encoding='utf-8') as f:
-                for line in f:
+                line = f.readline()
+                while line:
                     self.offsets.append(cur_offset)
                     obj = json.loads(line)
                     seq = obj.get('sequence', obj)
                     self.seq_lens.append(len(seq))
                     cur_offset = f.tell()
+                    line = f.readline()
             self.data = None
         else:
             self.data = read_file_by_extension(data_path)
