@@ -4,6 +4,8 @@ import warnings
 
 import torch
 from torch import nn
+
+from .losses import CryptoLoss
 import torch.nn.functional as F
 from transformers import PreTrainedModel, Cache, DynamicCache, StaticCache
 from transformers.activations import ACT2FN
@@ -960,7 +962,8 @@ class TimeMoeForPrediction(TimeMoePreTrainedModel, TSGenerationMixin):
             self.horizon_length_map[horizon_length] = i
         self.lm_heads = nn.ModuleList(lm_head_list)
 
-        self.loss_function = torch.nn.HuberLoss(reduction='none', delta=2.0)
+        # Custom loss designed for financial forecasting tasks
+        self.loss_function = CryptoLoss(delta=0.01, f1_weight=0.1, reduction='none')
 
         # Initialize weights and apply final processing
         self.post_init()
