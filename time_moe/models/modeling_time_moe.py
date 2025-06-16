@@ -944,6 +944,8 @@ class TimeMoeForPrediction(TimeMoePreTrainedModel, TSGenerationMixin):
         self.apply_aux_loss = config.apply_aux_loss
         self.num_experts_per_tok = config.num_experts_per_tok
         self.router_aux_loss_factor = config.router_aux_loss_factor
+        # coefficient for directional F1 auxiliary term
+        self.directional_loss_factor = getattr(config, 'directional_loss_factor', 0.1)
 
         self.model = TimeMoeModel(config)
         # output layer
@@ -960,7 +962,9 @@ class TimeMoeForPrediction(TimeMoePreTrainedModel, TSGenerationMixin):
             self.horizon_length_map[horizon_length] = i
         self.lm_heads = nn.ModuleList(lm_head_list)
 
-        self.loss_function = torch.nn.HuberLoss(reduction='none', delta=2.0)
+        self.loss_function = torch.nn.HuberLoss(reduction='none', delta=0.01)
+
+        # Huber loss with small delta and auxiliary directional F1 term
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1099,11 +1103,31 @@ class TimeMoeForPrediction(TimeMoePreTrainedModel, TSGenerationMixin):
 
         if loss_masks is not None:
             losses = losses * loss_masks
-            loss = losses.sum() / loss_masks.sum()
+            base_loss = losses.sum() / loss_masks.sum()
+            mask = loss_masks
         else:
-            loss = torch.mean(losses)
+            base_loss = torch.mean(losses)
+            mask = None
+
+        # directional F1 term
+        f1 = self._calc_directional_f1(shift_predictions, shift_labels, mask)
+        loss = base_loss + self.directional_loss_factor * (1.0 - f1)
 
         return loss
+
+    def _calc_directional_f1(self, preds, labels, mask=None):
+        pred_prob = torch.sigmoid(preds * 5.0)
+        true = (labels >= 0).float()
+        if mask is not None:
+            pred_prob = pred_prob * mask
+            true = true * mask
+        tp = torch.sum(pred_prob * true)
+        fp = torch.sum(pred_prob * (1 - true))
+        fn = torch.sum((1 - pred_prob) * true)
+        precision = tp / (tp + fp + 1e-8)
+        recall = tp / (tp + fn + 1e-8)
+        f1 = 2 * precision * recall / (precision + recall + 1e-8)
+        return f1
 
     def prepare_inputs_for_generation(
             self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
