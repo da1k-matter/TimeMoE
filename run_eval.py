@@ -51,22 +51,30 @@ class MAEMetric(SumEvalMetric):
 
 
 class TimeMoE:
-    def __init__(self, model_path, device, context_length, prediction_length, **kwargs):
+    def __init__(self, model_path, device, context_length, prediction_length, flash_attn=False, **kwargs):
         try:
             from time_moe.models.modeling_time_moe import TimeMoeForPrediction
+            args = {
+                'device_map': device,
+                'torch_dtype': 'auto',
+            }
+            if flash_attn:
+                args['attn_implementation'] = 'flash_attention_2'
             model = TimeMoeForPrediction.from_pretrained(
                 model_path,
-                device_map=device,
-                # attn_implementation='flash_attention_2',
-                torch_dtype='auto',
+                **args,
             )
-        except:
+        except Exception:
+            args = {
+                'device_map': device,
+                'torch_dtype': 'auto',
+                'trust_remote_code': True,
+            }
+            if flash_attn:
+                args['attn_implementation'] = 'flash_attention_2'
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
-                device_map=device,
-                # attn_implementation='flash_attention_2',
-                torch_dtype='auto',
-                trust_remote_code=True,
+                **args,
             )
 
         logging.info(f'>>> Model dtype: {model.dtype}; Attention:{model.config._attn_implementation}')
@@ -126,7 +134,8 @@ def evaluate(args):
         args.model,
         device,
         context_length=context_length,
-        prediction_length=prediction_length
+        prediction_length=prediction_length,
+        flash_attn=args.flash_attn,
     )
     if args.data.endswith('.csv'):
         dataset = BenchmarkEvalDataset(
@@ -231,6 +240,11 @@ if __name__ == '__main__':
         type=int,
         default=1,
         help='Number of features for each time step'
+    )
+    parser.add_argument(
+        '--flash_attn',
+        action='store_true',
+        help='Enable flash attention when loading the model'
     )
     args = parser.parse_args()
     if args.context_length is None:

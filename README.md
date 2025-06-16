@@ -101,6 +101,8 @@ pip install ninja
 MAX_JOBS=64 pip install flash-attn==2.6.3 --no-build-isolation
 ```
 
+Once installed, pass the `--flash_attn` flag to `main.py` or `run_eval.py` to enable Flash Attention during training or evaluation.
+
 ### 📈 Making Forecasts
 
 **Note**: The `max_position_embeddings` for Time-MoE is set to during training. This means the maximum sequence length for Time-MoE is **4096**. To achieve optimal forecasting performance, it is recommended that **the sum of `context_length` and `prediction_length` does not exceed 4096.**
