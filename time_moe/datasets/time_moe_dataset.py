@@ -10,11 +10,12 @@ from .binary_dataset import BinaryDataset
 
 class TimeMoEDataset(TimeSeriesDataset):
 
-    def __init__(self, data_folder, normalization_method=None):
+    def __init__(self, data_folder, normalization_method=None, streaming: bool = False):
         self.data_folder = data_folder
         self.normalization_method = normalization_method
         self.datasets = []
         self.num_tokens = None
+        self.streaming = streaming
 
         if normalization_method is None:
             self.normalization_method = None
@@ -33,7 +34,7 @@ class TimeMoEDataset(TimeSeriesDataset):
             if len(ds) > 0:
                 self.datasets.append(ds)
         elif GeneralDataset.is_valid_path(self.data_folder):
-            ds = GeneralDataset(self.data_folder)
+            ds = GeneralDataset(self.data_folder, streaming=streaming)
             if len(ds) > 0:
                 self.datasets.append(ds)
         else:
@@ -42,7 +43,7 @@ class TimeMoEDataset(TimeSeriesDataset):
                 for file in files:
                     fn_path = os.path.join(root, file)
                     if file != BinaryDataset.meta_file_name and GeneralDataset.is_valid_path(fn_path):
-                        ds = GeneralDataset(fn_path)
+                        ds = GeneralDataset(fn_path, streaming=streaming)
                         if len(ds) > 0:
                             self.datasets.append(ds)
                 for sub_folder in dirs:
