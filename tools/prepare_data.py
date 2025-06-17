@@ -17,7 +17,7 @@ SCALER_FILE = "crypto_scaler.joblib"
 
 CONTEXT_LENGTH = 500
 PREDICTION_LENGTH = 48
-MIN_BARS = 39000
+MIN_BARS = 0
 
 USE_TA = ['rsi', 'adx', 'atr', 'sma']
 
