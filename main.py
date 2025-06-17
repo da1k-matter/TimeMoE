@@ -13,6 +13,13 @@ if __name__ == "__main__":
         help="Path to training data. (Folder contains data files, or data file)",
     )
     parser.add_argument(
+        "--val_data_path",
+        "-v",
+        type=str,
+        default=None,
+        help="Path to validation data. If not set, evaluation is disabled",
+    )
+    parser.add_argument(
         "--model_path",
         "-m",
         type=str,
@@ -182,6 +189,7 @@ if __name__ == "__main__":
         max_length=args.max_length,
         stride=args.stride,
         data_path=args.data_path,
+        val_data_path=args.val_data_path,
         normalization_method=args.normalization_method,
         attn_implementation=args.attn_implementation,
         micro_batch_size=args.micro_batch_size,
