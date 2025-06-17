@@ -16,14 +16,15 @@ from .ts_generation_mixin import TSGenerationMixin
 
 logger = logging.get_logger(__name__)
 
-# if is_flash_attn_2_available():
-#     from flash_attn import flash_attn_func, flash_attn_varlen_func
-#     from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
+# flash-attn is optional. If it's not installed we fall back to eager attention
 try:
     from flash_attn import flash_attn_func, flash_attn_varlen_func
     from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
-except:
-    pass
+    _flash_attn_available = True
+except Exception:
+    flash_attn_func = None
+    flash_attn_varlen_func = None
+    _flash_attn_available = False
 
 
 def _get_unpad_data(attention_mask):
@@ -464,6 +465,10 @@ class TimeMoeAttention(nn.Module):
 class TimeMoeFlashAttention2(TimeMoeAttention):
 
     def __init__(self, *args, **kwargs):
+        if not _flash_attn_available:
+            raise ImportError(
+                "flash-attn is not installed. Install it or set `attn_implementation='eager'`."
+            )
         super().__init__(*args, **kwargs)
         self._flash_attn_uses_top_left_mask = not is_flash_attn_greater_or_equal_2_10()
 

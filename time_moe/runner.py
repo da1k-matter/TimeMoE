@@ -5,6 +5,7 @@ from functools import reduce
 from operator import mul
 
 import torch
+from transformers.utils import is_flash_attn_2_available
 
 from time_moe.datasets.time_moe_dataset import TimeMoEDataset
 from time_moe.datasets.time_moe_window_dataset import TimeMoEWindowDataset
@@ -41,6 +42,9 @@ class TimeMoeRunner:
             except:
                 log_in_local_rank_0('Flash attention import failed, switching to eager attention.', type='warn')
                 attn = 'eager'
+        elif attn == 'flash_attention_2' and not is_flash_attn_2_available():
+            log_in_local_rank_0('Flash Attention 2 is not available, switching to eager attention.', type='warn')
+            attn = 'eager'
 
         if attn == 'eager':
             log_in_local_rank_0('Use Eager Attention')
