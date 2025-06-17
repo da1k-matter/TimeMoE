@@ -62,7 +62,7 @@ class TimeMoeRunner:
             model = TimeMoeForPrediction.from_pretrained(model_path, **kwargs)
         return model
 
-    def train_model(self, from_scratch: bool = False, **kwargs):
+    def train_model(self, from_scratch: bool = False, val_data_path: str = None, **kwargs):
         setup_seed(self.seed)
 
         train_config = kwargs
@@ -198,10 +198,21 @@ class TimeMoeRunner:
             input_size=train_config.get("input_size", 1),
             streaming=train_config.get("data_streaming", False),
         )
+        eval_ds = None
+        if val_data_path is not None and training_args.evaluation_strategy != "no":
+            eval_ds = self.get_eval_dataset(
+                val_data_path,
+                max_length=train_config["max_length"],
+                stride=train_config["stride"],
+                normalization_method=train_config["normalization_method"],
+                input_size=train_config.get("input_size", 1),
+                streaming=train_config.get("data_streaming", False),
+            )
         trainer = TimeMoeTrainer(
             model=model,
             args=training_args,
             train_dataset=train_ds,
+            eval_dataset=eval_ds,
         )
         trainer.add_callback(LossProgressCallback())
         trainer.train()
@@ -227,6 +238,16 @@ class TimeMoeRunner:
             input_size=input_size,
         )
         return window_dataset
+
+    def get_eval_dataset(self, data_path, max_length, stride, normalization_method, input_size=1, streaming=False):
+        return self.get_train_dataset(
+            data_path,
+            max_length=max_length,
+            stride=stride,
+            normalization_method=normalization_method,
+            input_size=input_size,
+            streaming=streaming,
+        )
 
 
 def setup_seed(seed: int = 9899):
