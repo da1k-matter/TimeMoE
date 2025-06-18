@@ -15,7 +15,9 @@ DATA_DIR = "data_test"
 OUTPUT_FILE = "prepared_crypto_data.jsonl"
 TRAIN_OUTPUT_FILE = "train_" + OUTPUT_FILE
 VAL_OUTPUT_FILE = "val_" + OUTPUT_FILE
-VAL_SIZE = 1000
+
+DEFAULT_TRAIN_SIZE = 30000  # Number of bars immediately before the validation split
+DEFAULT_VAL_SIZE = 2000     # Number of bars used for validation
 SCALER_FILE = "crypto_scaler.joblib"
 
 CONTEXT_LENGTH = 500
@@ -51,8 +53,16 @@ def add_features(df):
 
 # --- 3. MAIN DATA PREPARATION PIPELINE (REWRITTEN) ---
 
-def run_preparation():
-    """Executes the full data preparation pipeline using a two-pass approach."""
+def run_preparation(train_size=DEFAULT_TRAIN_SIZE, val_size=DEFAULT_VAL_SIZE):
+    """Executes the full data preparation pipeline using a two-pass approach.
+
+    Parameters
+    ----------
+    train_size: int
+        Number of bars to include in the training set for each CSV file.
+    val_size: int
+        Number of bars from the end of each CSV file used for validation.
+    """
     csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
     if not csv_files:
         print(f"Error: No CSV files found in '{DATA_DIR}'.")
@@ -132,9 +142,10 @@ def run_preparation():
 
             total_length = CONTEXT_LENGTH + PREDICTION_LENGTH
 
-            # Split into train/val by last VAL_SIZE bars
-            split_idx = max(len(normalized_data) - VAL_SIZE, 0)
-            train_data = normalized_data[:split_idx]
+            # Split into train/val using user-defined sizes
+            split_idx = max(len(normalized_data) - val_size, 0)
+            train_start = max(split_idx - train_size, 0)
+            train_data = normalized_data[train_start:split_idx]
             val_data = normalized_data[split_idx:]
 
             num_train_sequences = len(train_data) - total_length + 1
@@ -171,4 +182,14 @@ def run_preparation():
     print(f"IMPORTANT: Remember to set 'input_len = {NUM_FEATURES}' in your model's config file.")
 
 if __name__ == "__main__":
-    run_preparation()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Prepare crypto dataset")
+    parser.add_argument("--train_size", type=int, default=DEFAULT_TRAIN_SIZE,
+                        help="Number of bars to use for training from each CSV file")
+    parser.add_argument("--val_size", type=int, default=DEFAULT_VAL_SIZE,
+                        help="Number of bars to use for validation from each CSV file")
+
+    args = parser.parse_args()
+
+    run_preparation(train_size=args.train_size, val_size=args.val_size)
