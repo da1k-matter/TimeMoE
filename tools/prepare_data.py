@@ -13,6 +13,9 @@ from tqdm import tqdm
 # --- 1. GLOBAL CONFIGURATION ---
 DATA_DIR = "data_test"
 OUTPUT_FILE = "prepared_crypto_data.jsonl"
+TRAIN_OUTPUT_FILE = "train_" + OUTPUT_FILE
+VAL_OUTPUT_FILE = "val_" + OUTPUT_FILE
+VAL_SIZE = 1000
 SCALER_FILE = "crypto_scaler.joblib"
 
 CONTEXT_LENGTH = 500
@@ -102,9 +105,10 @@ def run_preparation():
     print("\nPass 2: Processing each file individually to create sequences...")
     
     total_sequences_written = 0
+    total_val_sequences_written = 0
     processed_files_count = 0
 
-    with open(OUTPUT_FILE, 'w') as f_out:
+    with open(TRAIN_OUTPUT_FILE, 'w') as f_train, open(VAL_OUTPUT_FILE, 'w') as f_val:
         for f in tqdm(csv_files, desc="Processing individual files"):
             df = pd.read_csv(f)
             if len(df) < MIN_BARS:
@@ -126,27 +130,44 @@ def run_preparation():
             # 2. Normalize using the ALREADY FITTED global scaler
             normalized_data = scaler.transform(df_featured)
 
-            # 3. Create and write sequences for THIS file
             total_length = CONTEXT_LENGTH + PREDICTION_LENGTH
-            num_sequences_in_file = len(normalized_data) - total_length + 1
-            
-            if num_sequences_in_file <= 0:
-                continue
 
-            for i in tqdm(range(num_sequences_in_file), desc=f"Sequences in {os.path.basename(f)}", leave=False):
-                window = normalized_data[i : i + total_length]
-                sequence = window.flatten().tolist()
-                json_line = json.dumps({
-                    "sequence": sequence,
-                    "prediction_length": PREDICTION_LENGTH
-                })
-                f_out.write(json_line + '\n')
-            
-            total_sequences_written += num_sequences_in_file
+            # Split into train/val by last VAL_SIZE bars
+            split_idx = max(len(normalized_data) - VAL_SIZE, 0)
+            train_data = normalized_data[:split_idx]
+            val_data = normalized_data[split_idx:]
+
+            num_train_sequences = len(train_data) - total_length + 1
+            if num_train_sequences > 0:
+                for i in tqdm(range(num_train_sequences), desc=f"Train seqs in {os.path.basename(f)}", leave=False):
+                    window = train_data[i : i + total_length]
+                    sequence = window.flatten().tolist()
+                    json_line = json.dumps({
+                        "sequence": sequence,
+                        "prediction_length": PREDICTION_LENGTH
+                    })
+                    f_train.write(json_line + '\n')
+
+                total_sequences_written += num_train_sequences
+
+            num_val_sequences = len(val_data) - total_length + 1
+            if num_val_sequences > 0:
+                for i in tqdm(range(num_val_sequences), desc=f"Val seqs in {os.path.basename(f)}", leave=False):
+                    window = val_data[i : i + total_length]
+                    sequence = window.flatten().tolist()
+                    json_line = json.dumps({
+                        "sequence": sequence,
+                        "prediction_length": PREDICTION_LENGTH
+                    })
+                    f_val.write(json_line + '\n')
+
+                total_val_sequences_written += num_val_sequences
+
             processed_files_count += 1
-            
+
     print(f"\nDone! Processed {processed_files_count} files.")
-    print(f"Created '{OUTPUT_FILE}' with a total of {total_sequences_written} sequences.")
+    print(f"Created '{TRAIN_OUTPUT_FILE}' with a total of {total_sequences_written} sequences.")
+    print(f"Created '{VAL_OUTPUT_FILE}' with a total of {total_val_sequences_written} sequences.")
     print(f"IMPORTANT: Remember to set 'input_len = {NUM_FEATURES}' in your model's config file.")
 
 if __name__ == "__main__":
