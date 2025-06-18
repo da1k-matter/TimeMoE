@@ -22,8 +22,6 @@ SCALER_FILE = "crypto_scaler.joblib"
 
 CONTEXT_LENGTH = 500
 PREDICTION_LENGTH = 48
-# Files with fewer rows than this are skipped during processing
-MIN_BARS = DEFAULT_TRAIN_SIZE + DEFAULT_VAL_SIZE
 
 USE_TA = ['rsi', 'adx', 'atr', 'sma']
 
