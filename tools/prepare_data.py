@@ -15,12 +15,15 @@ DATA_DIR = "data_test"
 OUTPUT_FILE = "prepared_crypto_data.jsonl"
 TRAIN_OUTPUT_FILE = "train_" + OUTPUT_FILE
 VAL_OUTPUT_FILE = "val_" + OUTPUT_FILE
-VAL_SIZE = 1000
+
+DEFAULT_TRAIN_SIZE = 30000  # Number of bars immediately before the validation split
+DEFAULT_VAL_SIZE = 2000     # Number of bars used for validation
 SCALER_FILE = "crypto_scaler.joblib"
 
 CONTEXT_LENGTH = 500
 PREDICTION_LENGTH = 48
-MIN_BARS = 0
+# Files with fewer rows than this are skipped during processing
+MIN_BARS = DEFAULT_TRAIN_SIZE + DEFAULT_VAL_SIZE
 
 USE_TA = ['rsi', 'adx', 'atr', 'sma']
 
@@ -51,12 +54,22 @@ def add_features(df):
 
 # --- 3. MAIN DATA PREPARATION PIPELINE (REWRITTEN) ---
 
-def run_preparation():
-    """Executes the full data preparation pipeline using a two-pass approach."""
+def run_preparation(train_size=DEFAULT_TRAIN_SIZE, val_size=DEFAULT_VAL_SIZE):
+    """Executes the full data preparation pipeline using a two-pass approach.
+
+    Parameters
+    ----------
+    train_size: int
+        Number of bars to include in the training set for each CSV file.
+    val_size: int
+        Number of bars from the end of each CSV file used for validation.
+    """
     csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
     if not csv_files:
         print(f"Error: No CSV files found in '{DATA_DIR}'.")
         return
+
+    min_required_bars = train_size + val_size
 
     # --- PASS 1: FIT THE SCALER ON ALL DATA GLOBALLY ---
     print("Pass 1: Fitting the Scaler on all available data...")
@@ -64,7 +77,7 @@ def run_preparation():
     all_data_for_scaler = []
     for f in tqdm(csv_files, desc="Reading files for scaler"):
         df = pd.read_csv(f)
-        if len(df) < MIN_BARS:
+        if len(df) < min_required_bars:
             continue
             
         df.columns = [str(col).lower().strip() for col in df.columns]
@@ -78,7 +91,7 @@ def run_preparation():
         all_data_for_scaler.append(df)
 
     if not all_data_for_scaler:
-        print("No files met the MIN_BARS requirement. Exiting.")
+        print("No files contained the required minimum number of bars. Exiting.")
         return
 
     # Concatenate DataFrames with a proper DatetimeIndex
@@ -111,7 +124,7 @@ def run_preparation():
     with open(TRAIN_OUTPUT_FILE, 'w') as f_train, open(VAL_OUTPUT_FILE, 'w') as f_val:
         for f in tqdm(csv_files, desc="Processing individual files"):
             df = pd.read_csv(f)
-            if len(df) < MIN_BARS:
+            if len(df) < min_required_bars:
                 continue
 
             df.columns = [str(col).lower().strip() for col in df.columns]
@@ -132,9 +145,10 @@ def run_preparation():
 
             total_length = CONTEXT_LENGTH + PREDICTION_LENGTH
 
-            # Split into train/val by last VAL_SIZE bars
-            split_idx = max(len(normalized_data) - VAL_SIZE, 0)
-            train_data = normalized_data[:split_idx]
+            # Split into train/val using user-defined sizes
+            split_idx = max(len(normalized_data) - val_size, 0)
+            train_start = max(split_idx - train_size, 0)
+            train_data = normalized_data[train_start:split_idx]
             val_data = normalized_data[split_idx:]
 
             num_train_sequences = len(train_data) - total_length + 1
@@ -171,4 +185,14 @@ def run_preparation():
     print(f"IMPORTANT: Remember to set 'input_len = {NUM_FEATURES}' in your model's config file.")
 
 if __name__ == "__main__":
-    run_preparation()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Prepare crypto dataset")
+    parser.add_argument("--train_size", type=int, default=DEFAULT_TRAIN_SIZE,
+                        help="Number of bars to use for training from each CSV file")
+    parser.add_argument("--val_size", type=int, default=DEFAULT_VAL_SIZE,
+                        help="Number of bars to use for validation from each CSV file")
+
+    args = parser.parse_args()
+
+    run_preparation(train_size=args.train_size, val_size=args.val_size)
