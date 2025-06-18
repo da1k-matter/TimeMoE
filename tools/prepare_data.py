@@ -22,7 +22,8 @@ SCALER_FILE = "crypto_scaler.joblib"
 
 CONTEXT_LENGTH = 500
 PREDICTION_LENGTH = 48
-MIN_BARS = 0
+# Files with fewer rows than this are skipped during processing
+MIN_BARS = DEFAULT_TRAIN_SIZE + DEFAULT_VAL_SIZE
 
 USE_TA = ['rsi', 'adx', 'atr', 'sma']
 
@@ -68,13 +69,15 @@ def run_preparation(train_size=DEFAULT_TRAIN_SIZE, val_size=DEFAULT_VAL_SIZE):
         print(f"Error: No CSV files found in '{DATA_DIR}'.")
         return
 
+    min_required_bars = train_size + val_size
+
     # --- PASS 1: FIT THE SCALER ON ALL DATA GLOBALLY ---
     print("Pass 1: Fitting the Scaler on all available data...")
     
     all_data_for_scaler = []
     for f in tqdm(csv_files, desc="Reading files for scaler"):
         df = pd.read_csv(f)
-        if len(df) < MIN_BARS:
+        if len(df) < min_required_bars:
             continue
             
         df.columns = [str(col).lower().strip() for col in df.columns]
@@ -88,7 +91,7 @@ def run_preparation(train_size=DEFAULT_TRAIN_SIZE, val_size=DEFAULT_VAL_SIZE):
         all_data_for_scaler.append(df)
 
     if not all_data_for_scaler:
-        print("No files met the MIN_BARS requirement. Exiting.")
+        print("No files contained the required minimum number of bars. Exiting.")
         return
 
     # Concatenate DataFrames with a proper DatetimeIndex
@@ -121,7 +124,7 @@ def run_preparation(train_size=DEFAULT_TRAIN_SIZE, val_size=DEFAULT_VAL_SIZE):
     with open(TRAIN_OUTPUT_FILE, 'w') as f_train, open(VAL_OUTPUT_FILE, 'w') as f_val:
         for f in tqdm(csv_files, desc="Processing individual files"):
             df = pd.read_csv(f)
-            if len(df) < MIN_BARS:
+            if len(df) < min_required_bars:
                 continue
 
             df.columns = [str(col).lower().strip() for col in df.columns]
