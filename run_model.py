@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import joblib
-setattr(np, 'NaN', np.nan)
 import pandas_ta
 import torch
 from transformers import AutoModelForCausalLM
@@ -12,11 +11,11 @@ from dataclasses import dataclass
 class InferenceConfig:
     """Configuration options for running the model."""
 
-    checkpoint: str = "./checkpoint"
-    scaler: str = "./scaler.joblib"
-    csv_path: str = "./data.csv"
+    checkpoint: str = "checkpoint-9205"
+    scaler: str = "crypto_scaler.joblib"
+    csv_path: str = "data_test/BTC_30.csv"
     context_length: int = 500
-    prediction_length: int = 1
+    prediction_length: int = 48
 
 
 config = InferenceConfig()
