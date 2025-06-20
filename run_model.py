@@ -84,10 +84,11 @@ def run_predict(cfg: Config):
         print(f"Using last {len(dataset.sequences)} samples for prediction")
 
     if len(dataset) > 0:
-        tail_raw = dataset.sequences[-1][-cfg.context_length:]
-        tail_inv = scaler.inverse_transform(tail_raw)[-5:]
-        df_tail = pd.DataFrame(tail_inv, columns=feature_names)
-        print("Dataset tail:")
+        # show the last few values of the exact context fed into the model
+        context_raw = dataset.sequences[-1][: cfg.context_length]
+        context_tail_inv = scaler.inverse_transform(context_raw)[-5:]
+        df_tail = pd.DataFrame(context_tail_inv, columns=feature_names)
+        print("Last context values:")
         print(df_tail)
 
     print("Creating dataloader...")
