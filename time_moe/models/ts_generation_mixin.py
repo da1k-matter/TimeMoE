@@ -32,8 +32,12 @@ class TSGenerationMixin(GenerationMixin):
         input_ids = input_ids.to(self.device)
         if len(input_ids.shape) == 2:
             batch_size, cur_len = input_ids.shape
+        elif len(input_ids.shape) == 3:
+            batch_size, cur_len, _ = input_ids.shape
         else:
-            raise ValueError('Input shape must be: [batch_size, seq_len]')
+            raise ValueError(
+                "Input shape must be: [batch_size, seq_len] or [batch_size, seq_len, input_size]"
+            )
         # init values
         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
