@@ -11,7 +11,24 @@ import joblib
 import pandas_ta
 import torch
 from transformers import AutoModelForCausalLM
+import argparse
+import os
 from dataclasses import dataclass
+
+
+class SimpleScaler:
+    """Minimal scaler for normalizing and denormalizing data."""
+
+    def __init__(self, mean, std, feature_names):
+        self.mean = mean
+        self.std = std
+        self.feature_names_in_ = feature_names
+
+    def transform(self, x):
+        return np.asarray(x - self.mean) / self.std
+
+    def inverse_transform(self, x):
+        return x * self.std + self.mean
 
 
 @dataclass
@@ -89,15 +106,28 @@ def sliding_forecast(model, data, scaler, context_length, prediction_length, dev
 def main():
     """Run forecasting using the parameters specified in ``config``."""
 
+    parser = argparse.ArgumentParser(description="Run Time-MoE forecasting")
+    parser.add_argument(
+        "--checkpoint",
+        default=config.checkpoint,
+        help="Path to the model checkpoint directory",
+    )
+    args = parser.parse_args()
+
+    ckpt_path = args.checkpoint
+    if not os.path.isdir(ckpt_path):
+        raise FileNotFoundError(f"Checkpoint directory not found: {ckpt_path}")
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     scaler = joblib.load(config.scaler)
     data, index = load_and_preprocess(config.csv_path, scaler)
 
     model = AutoModelForCausalLM.from_pretrained(
-        config.checkpoint,
+        ckpt_path,
         device_map=device,
-        trust_remote_code=True
+        trust_remote_code=True,
+        local_files_only=True,
     )
     model.eval()
 

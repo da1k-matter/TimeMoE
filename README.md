@@ -161,6 +161,21 @@ output = model.generate(normed_seqs, max_new_tokens=prediction_length)  # shape 
 normed_predictions = output[:, -prediction_length:]  # shape is [batch_size, 6]
 ```
 
+### Running `run_model.py`
+
+`run_model.py` provides a minimal example for local inference. By default it
+loads the checkpoint configured in the script, but you can specify your own
+checkpoint directory:
+
+```bash
+python run_model.py --checkpoint /path/to/checkpoint
+```
+
+The checkpoint path **must** exist locally because the script passes
+`local_files_only=True` when loading the model. Any custom Python files inside
+the directory (for example `ts_generation_mixin.py`) will be automatically
+imported.
+
 ### Evaluation
 
 + Prepare the benchmark datasets.
