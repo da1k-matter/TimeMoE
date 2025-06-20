@@ -70,14 +70,41 @@ def load_and_preprocess(csv_path, scaler):
 
 
 def sliding_forecast(model, data, scaler, context_length, prediction_length, device):
+    """Run a sliding window forecast.
+
+    Parameters
+    ----------
+    model : ``AutoModelForCausalLM``
+        Loaded Time-MoE model.
+    data : ndarray
+        Normalized features with shape ``(n_samples, input_size)``.
+    scaler : ``sklearn`` scaler
+        Scaler used to inverse transform the predictions.
+    context_length : int
+        Number of past observations fed into the model.
+    prediction_length : int
+        Horizon length to forecast.
+    device : str
+        Device on which the model runs.
+    """
+
+    input_size = model.config.input_size
+    if data.shape[1] != input_size:
+        raise ValueError(
+            f"Data has {data.shape[1]} features but model expects {input_size}."
+        )
+
     num_windows = len(data) - context_length
     preds = []
     for start in range(num_windows):
         window = data[start:start + context_length]
-        inputs = torch.tensor(window, dtype=torch.float32, device=device).unsqueeze(0)
+        tensor = torch.tensor(window, dtype=torch.float32, device=device)
+        if input_size == 1:
+            tensor = tensor.squeeze(-1)
+        tensor = tensor.unsqueeze(0)
         with torch.no_grad():
-            output = model.generate(inputs, max_new_tokens=prediction_length)
-        norm_pred = output[0, -prediction_length:].cpu().numpy()
+            output = model.generate(inputs=tensor, max_new_tokens=prediction_length)
+        norm_pred = output[0, -prediction_length:].cpu().numpy().reshape(-1, input_size)
         pred = scaler.inverse_transform(norm_pred)
         preds.append(pred)
     return np.array(preds)
