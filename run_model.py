@@ -67,6 +67,9 @@ def run_predict(cfg: Config):
     print(f"Loading scaler from {cfg.scaler_path}...")
     scaler = joblib.load(cfg.scaler_path)
     input_size = scaler.n_features_in_
+    feature_names = list(
+        getattr(scaler, "feature_names_in_", [f"f{i}" for i in range(input_size)])
+    )
     print(f"Loading dataset from {cfg.dataset_path}...")
 
     dataset = PredictionDataset(
@@ -74,6 +77,14 @@ def run_predict(cfg: Config):
         context_length=cfg.context_length,
         input_size=input_size,
     )
+
+    if len(dataset) > 0:
+        tail_raw = dataset.sequences[0][-cfg.context_length:]
+        tail_inv = scaler.inverse_transform(tail_raw)[-5:]
+        df_tail = pd.DataFrame(tail_inv, columns=feature_names)
+        print("Dataset tail:")
+        print(df_tail)
+
     print("Creating dataloader...")
     dl = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=False)
     print(f"Loading model from {cfg.model_path}...")
@@ -100,12 +111,14 @@ def run_predict(cfg: Config):
     flat = preds.reshape(-1, preds.shape[-1])
     inv = scaler.inverse_transform(flat)
     inv = inv.reshape(preds.shape)
-    feature_names = list(getattr(scaler, "feature_names_in_", [f"f{i}" for i in range(input_size)]))
+
     print(f"Predictions shape: {inv.shape}")
     if len(inv) > 0:
-        df = pd.DataFrame(inv[0], columns=feature_names)
-        print("Preview of first sample:")
-        print(df.head())
+        print("Prediction samples:")
+        for idx, sample in enumerate(inv):
+            df = pd.DataFrame(sample, columns=feature_names)
+            print(f"Sample {idx}:")
+            print(df)
     return inv
 
 
