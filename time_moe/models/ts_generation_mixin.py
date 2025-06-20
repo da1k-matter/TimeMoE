@@ -30,10 +30,15 @@ class TSGenerationMixin(GenerationMixin):
     ) -> Union[GenerateNonBeamOutput, torch.Tensor]:
         input_ids_origin_device = input_ids.device
         input_ids = input_ids.to(self.device)
-        if len(input_ids.shape) == 2:
+        if input_ids.dim() == 2:
             batch_size, cur_len = input_ids.shape
+            input_ids = input_ids.unsqueeze(-1)
+        elif input_ids.dim() == 3:
+            batch_size, cur_len, _ = input_ids.shape
         else:
-            raise ValueError('Input shape must be: [batch_size, seq_len]')
+            raise ValueError(
+                "Input shape must be [batch_size, seq_len] or [batch_size, seq_len, input_size]"
+            )
         # init values
         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
