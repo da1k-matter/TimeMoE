@@ -6,10 +6,20 @@ from typing import List
 import joblib
 import numpy as np
 import json
+import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 
 from time_moe.models.modeling_time_moe import TimeMoeForPrediction
+try:
+    from IPython import get_ipython
+    if get_ipython() is not None:
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except ImportError:  # pragma: no cover - fallback for minimal envs
+    from tqdm import tqdm
+
 
 
 @dataclass
@@ -32,8 +42,11 @@ class PredictionDataset(Dataset):
         self.input_size = input_size
         self.sequences: List[np.ndarray] = []
 
+        print(f"Loading sequences from {path}...")
         with open(path, "r", encoding="utf-8") as f:
-            for line in f:
+            total_lines = sum(1 for _ in f)
+        with open(path, "r", encoding="utf-8") as f:
+            for line in tqdm(f, total=total_lines, desc="Loading sequences"):
                 obj = json.loads(line)
                 seq = np.array(obj["sequence"], dtype=np.float32)
                 seq = seq.reshape(-1, input_size)
@@ -51,15 +64,19 @@ class PredictionDataset(Dataset):
 
 
 def run_predict(cfg: Config):
+    print(f"Loading scaler from {cfg.scaler_path}...")
     scaler = joblib.load(cfg.scaler_path)
     input_size = scaler.n_features_in_
+    print(f"Loading dataset from {cfg.dataset_path}...")
 
     dataset = PredictionDataset(
         cfg.dataset_path,
         context_length=cfg.context_length,
         input_size=input_size,
     )
+    print("Creating dataloader...")
     dl = DataLoader(dataset, batch_size=cfg.batch_size, shuffle=False)
+    print(f"Loading model from {cfg.model_path}...")
 
     model = TimeMoeForPrediction.from_pretrained(
         cfg.model_path,
@@ -69,10 +86,11 @@ def run_predict(cfg: Config):
         ignore_mismatched_sizes=True,
     )
     model.eval()
+    print("Generating predictions...")
 
     all_preds: List[np.ndarray] = []
     with torch.no_grad():
-        for batch in dl:
+        for batch in tqdm(dl, desc="Predicting"):
             inputs = batch.to(cfg.device)
             out = model.generate(inputs, max_new_tokens=cfg.prediction_length)
             preds = out[:, -cfg.prediction_length :].cpu().numpy()
@@ -82,6 +100,12 @@ def run_predict(cfg: Config):
     flat = preds.reshape(-1, preds.shape[-1])
     inv = scaler.inverse_transform(flat)
     inv = inv.reshape(preds.shape)
+    feature_names = list(getattr(scaler, "feature_names_in_", [f"f{i}" for i in range(input_size)]))
+    print(f"Predictions shape: {inv.shape}")
+    if len(inv) > 0:
+        df = pd.DataFrame(inv[0], columns=feature_names)
+        print("Preview of first sample:")
+        print(df.head())
     return inv
 
 
