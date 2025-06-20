@@ -4,10 +4,9 @@ import json
 import pandas as pd
 import numpy as np
 
-setattr(np, 'NaN', np.nan)
-import pandas_ta
 from sklearn.preprocessing import MinMaxScaler
 import joblib
+
 try:
     from IPython import get_ipython
     if get_ipython() is not None:
