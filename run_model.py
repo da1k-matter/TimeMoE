@@ -58,9 +58,14 @@ def main(cfg: InferenceConfig):
     with torch.no_grad():
         gen = model.generate(inputs.to(model.device), max_new_tokens=cfg.prediction_length)
     preds = gen[0, -cfg.prediction_length:].cpu().numpy()
-    preds_unscaled = scaler.inverse_transform(preds)
+    preds_2d = preds.reshape(cfg.prediction_length, input_size)
+    preds_unscaled = scaler.inverse_transform(preds_2d)
 
-    print("Last prediction:", preds_unscaled[-1])
+    if input_size == 1:
+        last_pred = preds_unscaled[-1, 0]
+    else:
+        last_pred = preds_unscaled[-1].tolist()
+    print("Last prediction:", last_pred)
 
 
 if __name__ == "__main__":
