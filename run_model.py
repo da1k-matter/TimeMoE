@@ -133,7 +133,6 @@ if __name__ == "__main__":
         model_path="checkpoint",
         scaler_path="crypto_scaler.joblib",
         dataset_path="val_prepared_crypto_data.jsonl",
-        predict_samples=10,
+        predict_samples=1,
     )
     predictions = run_predict(cfg)
-    print(predictions)

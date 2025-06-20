@@ -23,7 +23,7 @@ OUTPUT_FILE = "prepared_crypto_data.jsonl"
 TRAIN_OUTPUT_FILE = "train_" + OUTPUT_FILE
 VAL_OUTPUT_FILE = "val_" + OUTPUT_FILE
 
-DEFAULT_TRAIN_SIZE = 30000  # Number of bars immediately before the validation split
+DEFAULT_TRAIN_SIZE = 2000  # Number of bars immediately before the validation split
 DEFAULT_VAL_SIZE = 2000     # Number of bars used for validation
 SCALER_FILE = "crypto_scaler.joblib"
 
