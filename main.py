@@ -1,10 +1,11 @@
 import argparse
 from time_moe.runner import TimeMoeRunner
 import os
+
 os.environ["WANDB_MODE"] = "disabled"
 
 
-if __name__ == "__main__":
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_path",
@@ -170,7 +171,12 @@ if __name__ == "__main__":
         help="Enable streaming mode when loading dataset",
     )
 
-    args = parser.parse_args()
+    return parser
+
+
+def run(args=None):
+    parser = build_parser()
+    args = parser.parse_args(args)
 
     if args.flash_attn:
         args.attn_implementation = 'flash_attention_2'
@@ -184,7 +190,7 @@ if __name__ == "__main__":
         seed=args.seed,
     )
 
-    runner.train_model(
+    return runner.train_model(
         from_scratch=args.from_scratch,
         max_length=args.max_length,
         stride=args.stride,
@@ -220,3 +226,7 @@ if __name__ == "__main__":
         input_size=args.input_size,
         data_streaming=args.data_streaming,
     )
+
+
+if __name__ == "__main__":
+    run()

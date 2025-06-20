@@ -49,7 +49,11 @@ class TimeMoEWindowDataset:
         num_seqs = len(self.dataset)
         iterator = range(num_seqs)
         try:
-            from tqdm import tqdm
+            from IPython import get_ipython
+            if get_ipython() is not None:
+                from tqdm.notebook import tqdm
+            else:
+                from tqdm import tqdm
             iterator = tqdm(iterator, total=num_seqs)
         except ImportError:
             pass
@@ -117,7 +121,11 @@ class UniversalTimeMoEWindowDataset:
             random.shuffle(iterator)
 
         try:
-            from tqdm import tqdm
+            from IPython import get_ipython
+            if get_ipython() is not None:
+                from tqdm.notebook import tqdm
+            else:
+                from tqdm import tqdm
             iterator = tqdm(iterator, total=n_seqs)
         except ImportError:
             pass

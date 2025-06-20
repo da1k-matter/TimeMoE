@@ -8,7 +8,14 @@ import logging
 import torch
 import torch.distributed as dist
 from torch.utils.data import DistributedSampler, DataLoader
-from tqdm import tqdm
+try:
+    from IPython import get_ipython
+    if get_ipython() is not None:
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except ImportError:  # pragma: no cover - fallback for minimal envs
+    from tqdm import tqdm
 
 from transformers import AutoModelForCausalLM
 
