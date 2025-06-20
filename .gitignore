@@ -3,3 +3,4 @@ __pycache__
 prepared_crypto_data.jsonl
 crypto_scaler.joblib
 data_full
+checkpoint
