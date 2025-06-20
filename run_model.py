@@ -10,6 +10,7 @@ if not hasattr(np, "NaN"):
 import joblib
 import pandas_ta
 import torch
+import os
 from transformers import AutoModelForCausalLM
 from dataclasses import dataclass
 
@@ -23,6 +24,7 @@ class InferenceConfig:
     csv_path: str = "data_test/BTC_30.csv"
     context_length: int = 500
     prediction_length: int = 48
+    hf_token: str | None = None
 
 
 config = InferenceConfig()
@@ -76,7 +78,16 @@ def sliding_forecast(model, data, scaler, context_length, prediction_length, dev
         window = data[start:start + context_length]
         inputs = torch.tensor(window, dtype=torch.float32, device=device).unsqueeze(0)
         with torch.no_grad():
-            output = model.generate(inputs_embeds=inputs, max_new_tokens=prediction_length)
+            # Convert the raw values to embeddings using the model's embedding
+            # layer. We still need to supply dummy ``input_ids`` to satisfy the
+            # generation API which expects a 2-D tensor of token indices.
+            embeds = model.model.embed_layer(inputs)
+            dummy_ids = torch.zeros(embeds.shape[:2], dtype=torch.long, device=device)
+            output = model.generate(
+                input_ids=dummy_ids,
+                inputs_embeds=embeds,
+                max_new_tokens=prediction_length,
+            )
         norm_pred = output[0, -prediction_length:].cpu().numpy()
         pred = scaler.inverse_transform(norm_pred)
         preds.append(pred)
@@ -91,10 +102,12 @@ def main():
     scaler = joblib.load(config.scaler)
     data, index = load_and_preprocess(config.csv_path, scaler)
 
+    token = config.hf_token or os.environ.get("HF_TOKEN")
     model = AutoModelForCausalLM.from_pretrained(
         config.checkpoint,
         device_map=device,
-        trust_remote_code=True
+        trust_remote_code=True,
+        token=token,
     )
     model.eval()
 
