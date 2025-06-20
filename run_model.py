@@ -1,5 +1,12 @@
 import pandas as pd
 import numpy as np
+
+# ``pandas_ta`` expects the constant ``np.NaN`` which was removed in
+# recent versions of NumPy (>=2.0).  For compatibility we recreate this
+# alias before importing ``pandas_ta``.
+if not hasattr(np, "NaN"):
+    np.NaN = np.nan
+
 import joblib
 import pandas_ta
 import torch
