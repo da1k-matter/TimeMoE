@@ -30,6 +30,7 @@ class Config:
     context_length: int = 500
     prediction_length: int = 48
     batch_size: int = 32
+    predict_samples: int = 10
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     attn_implementation: str = "eager"
 
@@ -78,8 +79,12 @@ def run_predict(cfg: Config):
         input_size=input_size,
     )
 
+    if cfg.predict_samples > 0:
+        dataset.sequences = dataset.sequences[-cfg.predict_samples:]
+        print(f"Using last {len(dataset.sequences)} samples for prediction")
+
     if len(dataset) > 0:
-        tail_raw = dataset.sequences[0][-cfg.context_length:]
+        tail_raw = dataset.sequences[-1][-cfg.context_length:]
         tail_inv = scaler.inverse_transform(tail_raw)[-5:]
         df_tail = pd.DataFrame(tail_inv, columns=feature_names)
         print("Dataset tail:")
@@ -127,6 +132,7 @@ if __name__ == "__main__":
         model_path="checkpoint",
         scaler_path="crypto_scaler.joblib",
         dataset_path="val_prepared_crypto_data.jsonl",
+        predict_samples=10,
     )
     predictions = run_predict(cfg)
     print(predictions)
