@@ -76,7 +76,7 @@ def sliding_forecast(model, data, scaler, context_length, prediction_length, dev
         window = data[start:start + context_length]
         inputs = torch.tensor(window, dtype=torch.float32, device=device).unsqueeze(0)
         with torch.no_grad():
-            output = model.generate(inputs, max_new_tokens=prediction_length)
+            output = model.generate(inputs_embeds=inputs, max_new_tokens=prediction_length)
         norm_pred = output[0, -prediction_length:].cpu().numpy()
         pred = scaler.inverse_transform(norm_pred)
         preds.append(pred)
