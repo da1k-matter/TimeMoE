@@ -950,7 +950,8 @@ class TimeMoeForPrediction(TimeMoePreTrainedModel, TSGenerationMixin):
         self.num_experts_per_tok = config.num_experts_per_tok
         self.router_aux_loss_factor = config.router_aux_loss_factor
         # coefficient for directional F1 auxiliary term
-        self.directional_loss_factor = getattr(config, 'directional_loss_factor', 0.1)
+        self.directional_loss_factor = getattr(config, 'directional_loss_factor', 0.25)
+        self.directional_last_only = getattr(config, 'directional_last_only', True)
 
         self.model = TimeMoeModel(config)
         # output layer
@@ -1114,8 +1115,14 @@ class TimeMoeForPrediction(TimeMoePreTrainedModel, TSGenerationMixin):
             base_loss = torch.mean(losses)
             mask = None
 
-        # directional F1 term
-        f1 = self._calc_directional_f1(shift_predictions, shift_labels, mask)
+        # directional F1 term; optionally focus on the final predicted bar
+        if self.directional_last_only:
+            final_preds = shift_predictions[:, :, -1:, :]
+            final_labels = shift_labels[:, :, -1:, :]
+            final_mask = mask[:, :, -1:, :] if mask is not None else None
+            f1 = self._calc_directional_f1(final_preds, final_labels, final_mask)
+        else:
+            f1 = self._calc_directional_f1(shift_predictions, shift_labels, mask)
         loss = base_loss + self.directional_loss_factor * (1.0 - f1)
 
         return loss
