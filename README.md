@@ -192,6 +192,8 @@ You have the flexibility to save your converted data in `jsonl`, `json`, or `pic
 
 **Note: If your dataset is small, it is recommended to set `stride` to `1` by adding `--stride 1` to your training command.**
 
+**Directional Loss:** The model now computes directional F1 using only the final predicted bar. Adjust its weight with `directional_loss_factor` (default `0.25`). This behavior is controlled by `directional_last_only` in the config.
+
 **CPU**
 
 For training with cpu, execute the following command and ensure to replace `<data_path>` with the path to your prepared dataset:
