@@ -26,6 +26,7 @@ VAL_OUTPUT_FILE = "val_" + OUTPUT_FILE
 DEFAULT_TRAIN_SIZE = 2000  # Number of bars immediately before the validation split
 DEFAULT_VAL_SIZE = 2000     # Number of bars used for validation
 SCALER_FILE = "crypto_scaler.joblib"
+FEATURE_MAP_FILE = "feature_map.json"
 
 CONTEXT_LENGTH = 500
 PREDICTION_LENGTH = 48
@@ -117,6 +118,15 @@ def run_preparation(train_size=DEFAULT_TRAIN_SIZE, val_size=DEFAULT_VAL_SIZE):
     print(f"Scaler has been fitted globally and saved to: {SCALER_FILE}")
     final_feature_columns = scaler_fit_df.columns.tolist()
     NUM_FEATURES = len(final_feature_columns)
+
+    # Save feature-to-index mapping for easier reference when training
+    feature_map = {i: col for i, col in enumerate(final_feature_columns)}
+    with open(FEATURE_MAP_FILE, "w", encoding="utf-8") as fm:
+        json.dump(feature_map, fm, indent=2)
+
+    print("Feature index mapping:")
+    for idx, name in feature_map.items():
+        print(f"  {idx}: {name}")
 
 
     # --- PASS 2: PROCESS EACH FILE INDIVIDUALLY AND CREATE SEQUENCES ---
