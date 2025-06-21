@@ -152,6 +152,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Number of features for each time step",
     )
+    parser.add_argument(
+        "--target_col",
+        type=int,
+        default=None,
+        help="Index of feature to predict (0-based). If not set, all features are predicted",
+    )
 
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="adam beta1")
     parser.add_argument("--adam_beta2", type=float, default=0.95, help="adam beta2")
@@ -179,7 +185,7 @@ def run(args=None):
     args = parser.parse_args(args)
 
     if args.flash_attn:
-        args.attn_implementation = 'flash_attention_2'
+        args.attn_implementation = "flash_attention_2"
 
     if args.normalization_method == "none":
         args.normalization_method = None
@@ -224,6 +230,7 @@ def run(args=None):
         save_only_model=args.save_only_model,
         save_total_limit=args.save_total_limit,
         input_size=args.input_size,
+        target_cols=args.target_col,
         data_streaming=args.data_streaming,
     )
 
