@@ -188,6 +188,8 @@ To start fine-tuning Time-MoE, your dataset should be converted into a `jsonl` f
 
 You have the flexibility to save your converted data in `jsonl`, `json`, or `pickle` format. If you are using the [Time-300B](https://huggingface.co/datasets/Maple728/Time-300B) dataset, you can proceed without any additional preprocessing.
 
+Running `python tools/prepare_data.py` will also create a `feature_map.json` file. This file lists the order of features and their corresponding indices. Use these indices when specifying `--target_col` during training. For instance, if `feature_map.json` contains `"3": "close"`, then `--target_col 3` should be used to predict the close price.
+
 ### Training Time-MoE on Your Dataset
 
 **Note: If your dataset is small, it is recommended to set `stride` to `1` by adding `--stride 1` to your training command.**
